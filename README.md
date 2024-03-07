@@ -23,3 +23,8 @@ The project is divided into three subdirectories:
 - **Peronospora**: contains the predictive models for Plasmopara viticola.
 - **NHH**: contains the predictive model for phenological phases.
 - **Drone**: contains the project and configuration for the open-hardware drone "HERMES-00" by NIRIS and UNITN-DII.
+- **RacemusClassifier**: includes the integration of the ResNet50 model, which is licensed under the Apache 2.0 License. The code developed specifically for the RacemusClassifier, excluding the ResNet50 model, is released under the MIT License. For more information about these licenses, please refer to the following links:
+  - [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0)
+  - [MIT License](https://opensource.org/licenses/MIT)
+
+Please note that while the RacemusClassifier's custom code is licensed under MIT, the usage of ResNet50 model follows the terms and conditions of the Apache 2.0 License. Users of RacemusClassifier should comply with both licenses accordingly.
