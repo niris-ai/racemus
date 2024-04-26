@@ -6,9 +6,16 @@ import numpy as np
 from datetime import datetime
 import math
 
+
+"""
+Versionamento.
+2024/03/21 > aggiornamento Andrea T. + Giogia A. su modello, riviste soglie e sommatorie e condizioni.
+"""
 class ModelloPeronospora:
 	# Una volta che il th supera il th non si può sapere la gravità dell'infezione 
 	def __init__(self, counter):
+		#Soglia pioggia cumulo per infezione primaria
+		self.rain_queue = []  # Inizializza rain_queue come lista vuota
 		# Variabile che conta il numero del cluster
 		self.counter = counter
 		
@@ -16,6 +23,7 @@ class ModelloPeronospora:
 		self.threshold_maturazione = 140 
 		self.sommatoria_maturazione = 0
 		self.avvenuta_maturazione_oospore = False
+		self.lista_giornaliera = []
 		
 		# VARIABILI CHECK GERMINAZIONE
 		self.avvenuta_germinazione = False
@@ -42,7 +50,8 @@ class ModelloPeronospora:
 		self.valori_orari_temperatura_mattina = []
 		self.valori_orari_temperatura_sera = []
 		self.sommatoria_percentuali = 0
-		self.threshold_umidità = 60
+		#self.threshold_umidità = 60
+		self.threshold_umidità = 92
 		self.valori_percentuale_incubazione = {
 			14 : (6.6,9.0),
 			15 : (7.6,10.5),
@@ -90,33 +99,37 @@ class ModelloPeronospora:
 		
 		# Statistiche
 		self.lista_date_eventi = []
-		
+	
 	def check_maturazione_oospore(self,temperatura, tempo, versione_verbose):
 		# PAR -->  ambient_temp
 		# Calcolo la sommatoria delle temperature registrate durante il giorno maggiori di 8 gradi
 		# Se questa sommatoria supera il threshold_maturazione allora ritorna True
 		# Ogni nuovo giorno fai il reset delle variabili (sommatoria)
+		# appendo tutto nella lista giornaliera
+		
+		self.lista_giornaliera.append(temperatura)
+		# ogni giorno a mezzanotte faccio il calcolo della media giornaliera
 		if(tempo.hour == 0 and tempo.minute == 0 and tempo.second == 0):
-			#print("Tmp maturazione  " + str(self.sommatoria_maturazione) + "  " + str(tempo))
-			self.sommatoria_maturazione = 0
-		if(tempo.minute == 0):
-			#print("wela" + str(self.sommatoria_maturazione))
-			if(temperatura > 8):
-				self.sommatoria_maturazione = self.sommatoria_maturazione + temperatura
-				# Condizioni ottimali per la maturazione raggiunte
-				if self.sommatoria_maturazione >= self.threshold_maturazione:
-					self.avvenuta_maturazione_oospore = True
-					if versione_verbose !=0:
-						print(str(self.counter) + " MATURAZIONE OOSPORE RAGGIUNTO IN DATA:  " + str(tempo))
+			media_giornaliera = sum(self.lista_giornaliera) / len(self.lista_giornaliera)
+			self.sommatoria_maturazione += media_giornaliera
+			if self.sommatoria_maturazione >= self.threshold_maturazione:
+				self.avvenuta_maturazione_oospore = True
+				if versione_verbose !=0:
+					print(str(self.counter) + " MATURAZIONE OOSPORE RAGGIUNTO IN DATA:  " + str(tempo))
 					self.lista_date_eventi.append(tempo)
-					return 1
+				return 1
+				
+		# aggiorno lista
+		self.lista_giornaliera = []
+
 		return 0
 
 	def check_germinazione_oospore(self, umidità, pioggia, temperatura, tempo, versione_verbose):
 		# PAR -->  ambient_temp, humidity, rainfall
 		
 		# Algortimo 2: 5mm di pioggia in 48h e t > 8gradi 
-		
+		# ANDREA/GIORGIA: Temperatura minima oraria o alzare la soglia a 14 gradi
+		# ANDREA/GIORGIA: La pioggia i 5mm dovrebbero essere non dispersi in 48 ore ma in tempo più ristretto
 		# Check ogni giorno per tenere traccia dei giorni passati 
 		if(tempo.hour == 0 and tempo.minute == 0 and tempo.second == 0):
 			self.giorno_passato = self.giorno_passato + 1
@@ -125,10 +138,11 @@ class ModelloPeronospora:
 				self.giorno_passato = 0
 				self.sommatoria_germinazione_pioggia_48h = 0
 		# Se la temperatura supera gli 8 gradi
-		if (temperatura > 8):
+		#if (temperatura > 8): -> ERA IMPOSTATA a 14
+		if (temperatura > 12):
 			# Aggiorna la sommatoria dei millimetri di pioggia
 			self.sommatoria_germinazione_pioggia_48h = self.sommatoria_germinazione_pioggia_48h + pioggia
-			# Se superiamo il valore di 5mm a temperatura > 8 allora ritorna true
+			# Se superiamo il valore di 5mm a temperatura > 8 allora ritorna true -> impostiamo 4mm
 			if(self.sommatoria_germinazione_pioggia_48h >= 5):
 				if versione_verbose !=0:
 					print(str(self.counter) + " GERMINAZIONE OOSPORE RAGGIUNTO IN DATA:  " + str(tempo))
@@ -153,8 +167,8 @@ class ModelloPeronospora:
 		if(self.ore_necessarie > 0):
 			# Se ho registrato tutti i valori di quell'ora
 			if(len(self.valori_orari) == 4):
-				# Fai la media dei valori e se superiamo i 3mm ritorna true
-				if(max(self.valori_orari) >= 3):
+				# Fai la SOMMA dei valori e se superiamo i 3mm ritorna true
+				if(sum(self.valori_orari) >= 2):
 					if versione_verbose !=0:
 						print(str(self.counter) + " AVVENUTA DISPERSIONE IN DATA: " + str(tempo) + " per i seguenti valori di piovosità: " + str(self.valori_orari))
 					self.lista_date_eventi.append((tempo))
@@ -181,26 +195,36 @@ class ModelloPeronospora:
 		return 0
 
 	def check_infezione_primaria(self,temperatura, pioggia, leaf_wet, tempo, versione_verbose):
-		if temperatura > 10:
+		if temperatura > 9:
 			self.record_temperature.append(temperatura)
-			#self.temperatura_media = (self.temperatura_media + temperatura)/2
 			self.temperatura_media = sum(self.record_temperature)/len(self.record_temperature)
 			
-			#! possibile sostituzione formula per calcolare la media (--> più veloce )
+			# Aggiungi il valore corrente di pioggia alla coda
+			self.rain_queue.append(pioggia)
 			
-			#print(leaf_wet, self.threshold_bagnatura)
-			if pioggia >= 3:
-				if versione_verbose !=0:
-					print(str(self.counter) +  " INFEZIONE PRIMARIA IN DATA: "+ str(tempo))
-				self.lista_date_eventi.append(tempo)
-				self.avvenuta_infezione_primaria = True
-				return 4
-			if leaf_wet > 0:
+			# Se abbiamo raccolto un'ora di dati sulla pioggia
+			if len(self.rain_queue) == 4:
+				# Calcola la somma della pioggia nell'ultima ora
+				rain_sum = sum(self.rain_queue)
+				
+				# Rimuovi il valore più vecchio dalla coda
+				self.rain_queue.pop(0)
+				
+				if rain_sum >= 3:
+					if versione_verbose !=0:
+						print(str(self.counter) +  " INFEZIONE PRIMARIA CAUSA PIOGGIA IN DATA: "+ str(tempo) + " " + str(rain_sum))
+					self.lista_date_eventi.append(tempo)
+					self.avvenuta_infezione_primaria = True
+					return 4
+			#ANDREA / GIORGIA: Temperatura media * bagnatura fogliare oraria >= 50
+			#ANDREA / GIORGIA: 10 ° per 5 ore di bagnatura = 50
+			if leaf_wet > 1:
+			#if(leaf_wet > self.threshold_bagnatura):
 				self.foglia_non_bagnata = []
 				self.counter_bagnatura_fogliare = self.counter_bagnatura_fogliare + 1
 				if self.temperatura_media * ((self.counter_bagnatura_fogliare*15)/60) >= 50:
 					if versione_verbose !=0:
-						print(str(self.counter) +  " INFEZIONE PRIMARIA IN DATA: "+ str(tempo))
+						print(str(self.counter) +  " INFEZIONE PRIMARIA CAUSA BAGNATURA IN DATA: "+ str(tempo) + " WET:" + str(leaf_wet))
 					self.lista_date_eventi.append(tempo)
 					self.avvenuta_infezione_primaria = True
 					return 4
@@ -217,7 +241,7 @@ class ModelloPeronospora:
 		return 0
 
 	def check_incubazione(self, temperatura, humidity, tempo, versione_verbose):  
-		
+		#probabile inizio durata di incubazione in % fornita da indici epidemiologici
 		# Ogni mezzanotte calcolo i valori registrati durante il giorno
 		if((len(self.valori_orari_temperatura_mattina) != 0 and (len(self.valori_orari_temperatura_sera) != 0)) and (tempo.hour == 0 and tempo.minute == 0 and tempo.second == 0)):
 			# Calcolo la media aritmetica giornaliera in base al max e min delle temperature registrate alle 9 e 21
@@ -269,7 +293,7 @@ class ModelloPeronospora:
 				# Se c'è tanta umidità
 				if(humidity >= self.threshold_umidità):
 					self.check_orario_umidità[tempo.hour].append(humidity)
-		if(tempo.hour == 4 and tempo.minute == 15):
+		if(tempo.hour == 4):
 			# check se ci sono 4 ore consecutive di umidità alta
 			ore_consecutive_umidità = 0
 			for key in self.check_orario_umidità:
@@ -326,7 +350,8 @@ class ModelloPeronospora:
 		# Prima condizione necessaria
 		if(temperatura > 11):
 			# Da vedere se il th è giusto o meno
-			if(leaf_wet > 0):
+			#if(leaf_wet > self.threshold_bagnatura):
+			if(leaf_wet > 1):
 				self.ore_bagnatura = self.ore_bagnatura + 1
 			#print(temperatura * (self.ore_bagnatura *15 / 60))
 			if(temperatura * (self.ore_bagnatura * 15 / 60) >= self.threshold_bagnatura_temperatura):
