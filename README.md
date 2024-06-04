@@ -3,6 +3,10 @@
 ## About
 This project aims to integrate predictive models and incorporate artificial intelligence into precision agriculture. The RACEMUS.AI project is a collaborative effort between NIRIS s.r.l., the University of Trento, and the Fondazione Edmund Mach, with the goal of advancing the field of artificial intelligence and its applications in smart agriculture.
 
+## Funded by the Autonomous Province of Trento
+This project was funded through the support of Provincial Law No. 6 of December 13, 1999 of the Autonomous Province of Trento, which provides aids for promoting research and development.
+
+
 ## License
 This repository is released under the MIT License. You can find the full text of the MIT License in the LICENSE file included in this repository.
 
